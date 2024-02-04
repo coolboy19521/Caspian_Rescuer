@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+Source Code & Circuit
+
+{% endblock title %}
+
+{% block content %}
+
+{% load static %}
+
+<style>
+    a {
+        text-decoration: none;
+    }
+</style>
+
+<div style="overflow-y: scroll;" class="text-center">
+    <h2 class="mt-5 mb-5">Circuit</h2>
+    <img style="width: 100%; height: 100%;" src="{% static 'img/circuit.jpg' %}">
+    <div class="text-center ms-4 mb-5 mt-2">
+        <h2 class="m-5">Code</h2>
+        <a href="https://github.com/zIlgar/Aqua-Protectors" target="blank">Github Link</a>
+    </div>
+</div>
+
+
+{% endblock content %}

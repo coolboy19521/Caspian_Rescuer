@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+Admin Login
+
+{% endblock title %}
+
+{% block content %}
+
+<div class="container mx-5 mt-5">
+    <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <input type="text" class="form-control" id="username" name="username" placeholder="Username">
+        </div>
+        <div class="mb-3">
+            <input type="password" class="form-control" id="password" name="password" placeholder="Password">
+        </div>
+        <button class="btn btn-primary" type="submit">
+            Log in
+        </button>
+    </form>
+</div>
+
+{% endblock content %}

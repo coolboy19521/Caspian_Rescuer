@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+See Device #{{ device_id }} on Map
+
+{% endblock title %}
+
+{% block content %}
+
+<style>
+    #cesiumContainer {
+        width: 100%;
+    }
+</style>
+
+<div id="cesiumContainer"></div>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.82/Build/Cesium/Widgets/widgets.css" rel="stylesheet"/>
+<script charset="utf-8" src="https://cesium.com/downloads/cesiumjs/releases/1.82/Build/Cesium/Cesium.js"></script>
+<script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NDJlY2I0NC1kYTlhLTRlYjItOTljMi01MTYzNmQyYzU4MDQiLCJpZCI6MTYxODQ3LCJpYXQiOjE2OTI2OTAzNzV9.VvykNlaA1m_1glf0zt01-DHOiH7eLz3GN5ioIg2vVRw'
+
+    let fetch_log = async pck => {
+        let response = await fetch(`/api/getLog/${pck}`)
+        let response_json = await response.json()
+
+        if (!coors) {
+            coors = response_json['data']
+
+            if (coors.length > 1) {
+                let [x, y] = coors[1]['must_go'].split(',')
+
+                x = parseInt(x) / 100
+                y = parseInt(y) / 100
+
+                let position = {
+                    latitude: y,
+                    longitude: x,
+                    height: 100000
+                }
+
+                let position_cartesian = Cesium.Cartesian3.fromDegrees(
+                    position.latitude,
+                    position.longitude,
+                    position.height
+                )
+
+                position_property.addSample(Cesium.JulianDate.fromDate(get_date(coors[1])), position_cartesian)
+
+                let entity = viewer.entities.add({
+                    position: position_cartesian,
+                    point: {
+                        pixelSize: 10,
+                        color: Cesium.Color.PINK
+                    }
+                })
+            }
+        } else {
+            let last = coors[coors.length - 1]['request_id']
+
+            for (let coor of response_json['data']) {
+                if (parseInt(coor['request_id']) > parseInt(last)) {
+                    let [x, y] = coor['gps_data'].split(',')
+
+                    x = parseInt(x) / 1000
+                    y = parseInt(y) / 1000
+                    
+                    let position = {
+                        latitude: y,
+                        longitude: x,
+                        height: 100000
+                    }
+                    
+                    let position_cartesian = Cesium.Cartesian3.fromDegrees(
+                        position.latitude,
+                        position.longitude,
+                        position.height
+                    )
+
+                    position_property.addSample(Cesium.JulianDate.fromDate(get_date(coor)), position_cartesian)
+
+                    let entity = viewer.entities.add({
+                        position: position_cartesian,
+                        point: {
+                            pixelSize: 10,
+                            color: Cesium.Color.RED
+                        }
+                    })
+
+                    console.log(coor)
+                    coors.push(coor)
+                }
+            }
+        }
+    }
+
+    let get_date = record => {
+        let date_splitted = record['date'].split('-')
+        let time_splitted = record['time'].split('.')
+
+        let year = date_splitted[0]
+        let month = date_splitted[1]
+        let day = date_splitted[2]
+
+        let hour = time_splitted[0]
+        let minute = time_splitted[1]
+        let second = time_splitted[2]
+
+        return new Date(year, month, day, hour, minute, second, 0)
+    }
+
+    let main = async () => {    
+        viewer.scene.primitives.add(Cesium.createOsmBuildings())
+        
+        await fetch_log(device_id)
+        
+        let start = Cesium.JulianDate.fromDate(get_date(coors[0]))
+        let stop = Cesium.JulianDate.addSeconds(start, Infinity, new Cesium.JulianDate())
+
+        viewer.clock.startTime = start.clone()
+        viewer.clock.stopTime = stop.clone()
+
+        viewer.clock.currentTime = start.clone()
+        
+        viewer.timeline.zoomTo(start, stop)
+
+        viewer.clock.multiplier = 5000
+
+        viewer.clock.shouldAnimate = true
+
+        let hour = 0
+
+        for (let record of coors) {
+            let date = get_date(record)
+
+            date.setHours(date.getHours() + hour)
+
+            let time = Cesium.JulianDate.fromDate(date)
+            
+            let [x, y] = record['gps_data'].split(',')
+            
+            x = parseInt(x) / 100
+            y = parseInt(y) / 100
+            
+            let position = {
+                latitude: y,
+                longitude: x,
+                height: 100000
+            }
+            
+            let position_cartesian = Cesium.Cartesian3.fromDegrees(
+                position.latitude,
+                position.longitude,
+                position.height
+            )
+
+            position_property.addSample(time, position_cartesian)
+
+            viewer.entities.add({
+                position: position_cartesian,
+                point: {
+                    pixelSize: 10,
+                    color: Cesium.Color.RED
+                }
+            })
+            
+            hour += 2
+        }
+
+        setInterval(() => fetch_log(device_id), 1000)
+
+        let time_interval = new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({
+            start: start,
+            stop: stop
+        })])
+
+        let device = viewer.entities.add({
+            availability: time_interval,
+            position: position_property,
+            point: {
+                pixelSize: 30,
+                color: Cesium.Color.GREEN
+            },
+            path: new Cesium.PathGraphics({
+                width: 3
+            }),
+        })
+
+        viewer.trackedEntity = device
+    }
+
+    let viewer = new Cesium.Viewer('cesiumContainer', {
+        terrainProvider: Cesium.createWorldTerrain()
+    })
+
+    viewer.scene.camera.frustum.fov = Cesium.Math.toRadians(100);
+
+    let device_id = parseInt("{{ device_id }}")
+
+    let position_property = new Cesium.SampledPositionProperty()
+    let coors = null
+
+    main()
+</script>
+
+{% endblock content %}

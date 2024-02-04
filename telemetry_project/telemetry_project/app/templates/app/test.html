@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+Device #{{ device_id }}
+
+{% endblock title %}
+
+{% block content %}
+
+<style>
+    /*
+    #test {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+    }
+    */
+</style>
+
+<div class="text-center" style="width: 100%" id="test">
+    <h2 class="mt-5 mb-5">
+        Tests for device #{{ device_id }}
+    </h2>
+
+    <div>
+        <button class="btn btn-primary" onclick="req_servo()">
+            Servo Test
+        </button>
+
+        <button class="btn ms-4 btn-primary" onclick="req_motor()">
+            Motor Test
+        </button>
+    </div>
+</div>
+
+<script>
+    let req_servo = async () => {
+        await fetch('/api/servoControl')
+    }
+
+    let req_motor = async () => {
+	      await fetch('/api/motorControl')
+	      
+	      console.log("hello, wolrd!")
+    }
+</script>
+
+{% endblock content %}

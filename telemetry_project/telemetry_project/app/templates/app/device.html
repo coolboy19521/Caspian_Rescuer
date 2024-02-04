@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+Device #{{ device_id }}
+
+{% endblock title %}
+
+{% block content %}
+
+<style>
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .col-12 {
+        height: 100%;
+    }
+
+    .first-div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .first-div h2,
+    .first-div p {
+        margin-bottom: 1em;
+    }
+
+    .first-div p {
+        line-height: 1.5;
+    }
+</style>
+
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <div class="first-div">
+            <div id="info_boxes" style="width: 100%;">
+                <div class="row mb-4">
+                    <div class="col-2"></div>
+                    <div class="col-3 p-2 border border-3 rounded"><h5 class="mt-3">Current Coors</h5><p id="cur_coors"></p></div>
+                    <div class="col-2"></div>
+                    <div class="col-3 p-2 border border-3 rounded"><h5 class="mt-3">Target Coors</h5><p id="target_coors"></p></div>
+                </div>
+                <div class="row mb-4">
+                    <div class="col-2"></div>
+                    <div class="col-3 p-1 border border-3 rounded"><h5 class="mt-3">Temperature & Humidity</h5><p id="temp_humid"></p></div>
+                    <div class="col-2"></div>
+                    <div class="col-3 p-1 border border-3 rounded"><h5 class="mt-3">Ultrasonic</h5><p id="ultra"></p></div>
+                </div>
+                <div class="row">
+                    <div class="col-2"></div>
+                    <div class="col-3 p-2 border border-3 rounded"><h5 class="mt-3">Gyro</h5><p id="gyro"></p></div>
+                    <div class="col-2"></div>
+                    <div class="col-3 p-2 border border-3 rounded"><h5 class="mt-3">Heart Beat Rate</h5><p id="heart_beat_rate"></p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<a class="btn btn-success" style="position: fixed; right: 230px; bottom: 20px;" href="{% url 'track_map' device_id %}">Track on map</a>
+<a class="btn btn-primary" style="position: fixed; right: 50px; bottom: 20px;" href="{% url 'detailed' device_id %}">Enter Detailed View</a>
+
+<script>
+    let info_boxes = document.querySelector('#info_boxes')
+
+    let response_json
+    let response
+
+    let getLog = async () => {
+        response = await fetch('/api/getLatest/{{ device_id }}')
+        response_json = await response.json()
+
+        if (response_json['status'] === 'attaboy') {
+            row = response_json['data'][response_json['data'].length - 1]
+
+            if (row['gps'] && row['gps_find_satellite']) {
+                coors = row['gps_data'].split(',')
+                x = parseInt(coors[0]) / 100
+                y = parseInt(coors[1]) / 100
+
+                m_coors = row['must_go'].split(',')
+                m_x = parseInt(m_coors[0]) / 100
+                m_y = parseInt(m_coors[1]) / 100
+
+                temperature = `${parseInt(row['temperature']) / 100}°`
+                humidity = `${parseInt(row['humidity']) / 100}%`
+
+                ultrasonic = row['ultrasonic']
+                gyro = row['compass_angle'] + '°'
+
+                hb_rate = row['heart_beat_rate']
+
+                info_boxes.querySelector('#cur_coors').innerHTML = `${x}", ${y}"`
+                info_boxes.querySelector('#target_coors').innerHTML = `${m_x}", ${m_y}"`
+                info_boxes.querySelector('#temp_humid').innerHTML = `${temperature}, ${humidity}`
+                info_boxes.querySelector('#ultra').innerHTML = `${ultrasonic} cm`
+                info_boxes.querySelector('#gyro').innerHTML = `${gyro}`
+                info_boxes.querySelector('#heart_beat_rate').innerHTML = `${hb_rate}`
+
+                console.log(x, y);
+            }
+        }
+    }
+
+    let interval = setInterval(getLog, 500)
+</script>
+
+{% endblock content %}

@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+
+{% block title %}
+
+Device #{{ device_id }}
+
+{% endblock title %}
+
+{% block content %}
+
+<style>
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .col-7 {
+        height: 100%;
+    }
+
+    .scrollable-col {
+        overflow-y: auto;
+        height: 100%;
+    }
+
+    .first-div {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .first-div h2,
+    .first-div p {
+        margin-bottom: 1em;
+    }
+
+    .first-div p {
+        line-height: 1.5;
+    }
+</style>
+
+<template id="info">
+    <div class="card m-2">
+        <div class="card-header" id="request_id">
+            Featured
+        </div>
+        <div class="card-body">
+            <h5 class="card-title mb-3" id="gps-data">Special title treatment</h5>
+            <p class="card-text">
+                <span id="must-go"></span>
+                <br>
+                <span id="angle"></span>
+                <br><br>
+                <span>Sensor data:</span>
+                <ul>
+                    <li>Ultrasonic: <span id="ultrasonic"></span></li>
+                    <li>Humidity: <span id="humidity"></span></li>
+                    <li>Temperature: <span id="temperature"></span></li>
+                    <li>Servo: <span id="servo"></span></li>
+                </ul>
+            </p>
+            <span href="" target="blank" class="badge bg-success" id="track">Healthy</span>
+        </div>
+    </div>
+</template>
+
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <div class="col-7 first-div">
+            <h2 class="mb-5">Device #{{ device_id }}</h2>
+            <p>Temperature & Humidity: <span id="temp_humidity"></span></p>
+            <p>Current Coors: <span id="cur_coors"></span></p>
+            <p>Target Coors: <span id="target_coors"></span></p>
+            <p>Ultrasonic: <span id="ultrasonic"></span></p>
+            <p>Gyro: <span id="cur_angle"></span></p>
+            <p>Heart Beat Rate: <span id="heart_beat_rate"></span></p>
+        </div>
+        <div class="col-5 p-3 scrollable-col" id="infos">
+            <input type="text" class="form-control mb-4" id="search_bar" onkeypress="search(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let template = document.querySelector('#info')
+    let infos_i = document.querySelector('#infos')
+    let input = document.querySelector('#search_bar')
+    let request_ids = []
+    let clone
+
+    let cur_coors = document.querySelector('#cur_coors')
+    let cur_angle = document.querySelector('#cur_angle')
+    let target_coors = document.querySelector('#target_coors')
+    let temp_humidity = document.querySelector('#temp_humidity')
+    let ultrasonic = document.querySelector('#ultrasonic')
+    let heart_beat_rate = document.querySelector('#heart_beat_rate')
+
+    let to_be_cloned = []
+
+    let response_json
+    let response
+
+    let show = true;
+    let reserved = []
+
+    let getLog = async () => {
+        response = await fetch('/api/getLog/{{ device_id }}')
+        response_json = await response.json()
+
+        if (response_json['status'] === 'attaboy') {
+            response_json['data'].splice(0, 1)
+
+            response_json['data'].forEach(row => {
+                if (!request_ids.includes(row['request_id'])) {
+                    request_ids.push(row['request_id'])
+                    to_be_cloned.push(row)
+                }
+            })
+
+            to_be_cloned.forEach(row => {
+                clone = template.content.cloneNode(true)
+
+                clone.querySelector('#request_id').innerHTML = `<span>Request #${row['request_id']}</span><span class='text-secondary' style='float: right;'>${row['date']} ${row['time']}</span>`
+
+                if (row['gps'] && row['gps_find_satellite']) {
+                    coors = row['gps_data'].split(',')
+                    x = parseInt(coors[0]) / 100
+                    y = parseInt(coors[1]) / 100
+
+                    m_coors = row['must_go'].split(',')
+                    m_x = parseInt(m_coors[0]) / 100
+                    m_y = parseInt(m_coors[1]) / 100
+
+                    temperature = parseInt(row['temperature']) / 100
+                    humidity = parseInt(row['humidity']) / 100
+
+                    clone.querySelector('#gps-data').innerHTML = `Coors are ${x}", ${y}"`
+                    clone.querySelector('#must-go').innerHTML = `Must go to coors ${m_x}", ${m_y}". ${row['distance']} km remaining`
+                    clone.querySelector('#angle').innerHTML = `Compass angle is ${row['compass_angle']}° and the target is ${row['must_go_angle']}°`
+                    clone.querySelector('#ultrasonic').innerHTML = row['ultrasonic'] + ' cm'
+                    clone.querySelector('#humidity').innerHTML = `${humidity}%`
+                    clone.querySelector('#temperature').innerHTML = `${temperature}°`
+                    clone.querySelector('#servo').innerHTML = row['servo_angle']
+
+                    cur_coors.innerHTML = `${x}", ${y}"`
+                    cur_angle.innerHTML = `${row['compass_angle']}°`
+                    target_coors.innerHTML = `${m_x}", ${m_y}"`
+                    temp_humidity.innerHTML = `${row['temperature'] / 100}°, ${row['humidity'] / 100}%`
+                    ultrasonic.innerHTML = `${row['ultrasonic']} cm`
+                    heart_beat_rate.innerHTML = `${row['heart_beat_rate']}`
+                }
+
+                if (show) {
+                    console.log('hey')
+                    infos_i.insertBefore(clone, infos_i.children[1])
+                }
+            })
+
+            to_be_cloned = []
+        }
+    }
+
+    let search = (event) => {
+        if (event.which == 13) {
+
+            console.log(input.value.length)
+
+            if (input.value.length > 0) {
+                show = false;
+
+                while (infos_i.children.length > 1) {
+                    reserved.push(infos_i.lastChild)
+                    infos_i.lastChild.remove()
+                }
+
+                let search_value = input.value.split(' ')
+
+                let search_item
+
+                if (search_value.length == 2) {
+                    response_json['data'].forEach((e) => {
+                        if (e['date'] == search_value[0] && e['time'] == search_value[1]) {
+                            search_item = e
+                        }
+                    })
+                } else {
+                    response_json['data'].forEach((e) => {
+                        if (e['request_id'] == parseInt(search_value[0])) {
+                            search_item = e
+                        }
+                    })
+                }
+
+                if (search_item) {
+                    clone = template.content.cloneNode(true)
+                }
+
+                if (search_item['gps'] && search_item['gps_find_satellite']) {
+                    clone.querySelector('#request_id').innerHTML = `<span>Request #${search_item['request_id']}</span><span class='text-secondary' style='float: right;'>${search_item['date']} ${search_item['time']}</span>`
+
+                    coors = search_item['gps_data'].split(',')
+                    x = parseInt(coors[0]) / 1000
+                    y = parseInt(coors[1]) / 1000
+
+                    m_coors = search_item['must_go'].split(',')
+                    m_x = parseInt(m_coors[0]) / 1000
+                    m_y = parseInt(m_coors[1]) / 1000
+
+                    clone.querySelector('#gps-data').innerHTML = `Coors are ${x}", ${y}"`
+                    clone.querySelector('#must-go').innerHTML = `Must go to coors ${m_x}", ${m_y}". ${search_item['distance']} km remaining`
+                    clone.querySelector('#angle').innerHTML = `Compass angle is ${search_item['compass_angle']}° and the target is ${search_item['must_go_angle']}°`
+                    clone.querySelector('#ultrasonic').innerHTML = search_item['ultrasonic'] + ' cm'
+                    clone.querySelector('#humidity').innerHTML = search_item['humidity'] + '%'
+                    clone.querySelector('#temperature').innerHTML = search_item['temperature'] + '°'
+                    clone.querySelector('#servo').innerHTML = search_item['servo_angle']
+
+                    cur_coors.innerHTML = `${x}", ${y}"`
+                    cur_angle.innerHTML = `${search_item['compass_angle']}°`
+                }
+
+                infos_i.insertBefore(clone, infos_i.children[1])
+            } else {
+                while (infos_i.children.length > 1) {
+                    infos_i.lastChild.remove()
+                }
+
+                while (reserved.length) {
+                    infos_i.insertBefore(reserved[0], infos_i.children[1])
+                    reserved.splice(0, 1)
+                }
+
+                show = true
+            }
+        }
+    }
+
+    let interval = setInterval(getLog, 500)
+</script>
+
+{% endblock content %}
